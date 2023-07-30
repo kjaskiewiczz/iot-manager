@@ -83,6 +83,9 @@ type App interface {
 	SyncDevices(context.Context, int, bool) error
 
 	GetEvents(ctx context.Context, filter model.EventsFilter) ([]model.Event, error)
+
+	GetDevices(ctx context.Context) ([]iothub.Device, error)
+	PreauthDevices(ctx context.Context, device []iothub.Device) error
 }
 
 // app is an app object
@@ -718,4 +721,21 @@ func (a *app) SetDeviceStateIntegration(
 
 func (a *app) GetEvents(ctx context.Context, filter model.EventsFilter) ([]model.Event, error) {
 	return a.store.GetEvents(ctx, filter)
+}
+
+func (a *app) GetDevices(ctx context.Context) ([]iothub.Device, error) {
+	integrations, err := a.GetIntegrations(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, integration := range integrations {
+		if integration.Provider == model.ProviderIoTHub {
+			return a.GetIoTHubDevices(ctx, &integration)
+		}
+	}
+	return nil, nil
+}
+
+func (a *app) PreauthDevices(ctx context.Context, devices []iothub.Device) error {
+	return a.devauth.PreauthDevices(ctx, devices)
 }

@@ -284,3 +284,10 @@ func (a *app) SetDeviceStateIoTHub(
 	}
 	return a.GetDeviceStateIoTHub(ctx, deviceID, integration)
 }
+
+func (a *app) GetIoTHubDevices(
+	ctx context.Context,
+	integration *model.Integration,
+) ([]iothub.Device, error) {
+	return a.iothubClient.GetDevices(ctx, integration.Credentials.ConnectionString)
+}

@@ -147,3 +147,20 @@ func (h *ManagementHandler) SetDeviceStateIntegration(c *gin.Context) {
 
 	c.JSON(http.StatusOK, state)
 }
+
+// GET /devices
+func (h *ManagementHandler) GetDevices(c *gin.Context) {
+	ctx, _, err := getContextAndIdentity(c)
+	if err != nil {
+		return
+	}
+
+	devices, err := h.app.GetDevices(ctx)
+	if err != nil {
+		rest.RenderError(c, http.StatusInternalServerError, err)
+		return
+	}
+	//h.app.PreauthDevices(ctx, devices)
+
+	c.JSON(http.StatusOK, devices)
+}

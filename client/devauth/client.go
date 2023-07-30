@@ -15,6 +15,7 @@
 package devauth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	common "github.com/mendersoftware/iot-manager/client"
+	"github.com/mendersoftware/iot-manager/client/iothub"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mendersoftware/go-lib-micro/identity"
@@ -45,10 +47,12 @@ var (
 const DefaultTimeout = time.Second * 10
 
 // Client interface exposing a portion of the internal deviceauth API.
+//
 //go:generate ../../utils/mockgen.sh
 type Client interface {
 	Ping(ctx context.Context) error
 	GetDevices(context.Context, []string) ([]Device, error)
+	PreauthDevices(context.Context, []iothub.Device) error
 }
 
 // Config provides initialization options for creating a new client.
@@ -205,4 +209,69 @@ func (c *client) GetDevices(
 		}
 		return nil, err
 	}
+}
+
+// PreauthDevice provides a functional handle to the API endpoint:
+// POST /api/internal/v1/devauth/tenants/{tenantID}/devices
+func (c *client) PreauthDevices(
+	ctx context.Context,
+	devices []iothub.Device,
+) error {
+	var tenantID string
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, DefaultTimeout)
+		defer cancel()
+	}
+	if id := identity.FromContext(ctx); id != nil {
+		tenantID = id.Tenant
+	}
+
+	for _, dev := range devices {
+		//body
+		var preAuthReq = struct {
+			IdData map[string]interface{} `json:"identity_data" valid:"-"`
+			PubKey string                 `json:"pubkey" valid:"required"`
+		}{
+			IdData: map[string]interface{}{
+				"azure_id": dev.DeviceID,
+			},
+			PubKey: string(dev.Auth.SymmetricKey.Primary),
+		}
+		b, _ := json.Marshal(preAuthReq)
+
+		// Prepare request
+		repl := strings.NewReplacer(":tenant", tenantID)
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodPost,
+			c.uri+repl.Replace(URIInternalDevices),
+			bytes.NewReader(b),
+		)
+		if err != nil {
+			return errors.Wrap(err, "devauth: error preparing request")
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		/*
+			if reqID := requestid.FromContext(ctx); reqID != "" {
+				req.Header.Set(requestid.RequestIdHeader, reqID)
+			}
+		*/
+		// Execute request
+		rsp, err := c.Do(req)
+		if err != nil {
+			return errors.Wrap(err, "devauth: error performing request")
+		}
+		defer rsp.Body.Close()
+
+		if rsp.StatusCode == http.StatusCreated {
+			continue
+		}
+		return errors.New("cannot preauth device")
+	}
+	return nil
 }

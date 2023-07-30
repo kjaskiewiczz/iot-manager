@@ -52,6 +52,7 @@ const (
 	APIURLIntegrationCredentials = APIURLIntegration + "/credentials"
 
 	APIURLDevice                 = "/devices/:id"
+	APIURLDevices                = "/devices"
 	APIURLDeviceState            = APIURLDevice + "/state"
 	APIURLDeviceStateIntegration = APIURLDevice + "/state/:integrationId"
 
@@ -122,6 +123,7 @@ func NewRouter(
 	managementAPI.GET(APIURLDeviceState, management.GetDeviceState)
 	managementAPI.GET(APIURLDeviceStateIntegration, management.GetDeviceStateIntegration)
 	managementAPI.PUT(APIURLDeviceStateIntegration, management.SetDeviceStateIntegration)
+	managementAPI.GET(APIURLDevices, management.GetDevices)
 
 	managementAPI.GET(APIURLEvents, management.GetEvents)
 
